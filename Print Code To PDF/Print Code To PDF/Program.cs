@@ -3,29 +3,36 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using iText.Kernel.Pdf;
+using iText.Layout;
+using iText.Layout.Element;
 
 namespace Print_Code_To_PDF
 {
     public class Program
     {
-        public static string ProductionGUI_Directory = @"C:\Users\Patrick\Documents\GitHub\ProductionGUI";
-        public static string Data_Directory = @"C:\Users\Patrick\Documents\GitHub\Print-Project-Code-to-PDF\DATA";
+        public static string ProductionGUI_Directory = @"C:\Users\patri\Documents\GitHub\Merlin-Test-Studio";
+        public static string destinationFolderPath = @"C:\Users\patri\Documents\GitHub\Print-Project-Code-to-PDF\DATA";
         public static string outputFilePath = "directory_tree.txt";
 
         static void Main(string[] args)
         {
             Console.WriteLine($"Searching the {ProductionGUI_Directory} for .cs files");
-            string[] targetExtensions = { ".cs", ".xaml" }; // Add or remove extensions as needed
+            string[] targetExtensions = { ".cs", ".xaml", ".xaml.cs" }; // Add or remove extensions as needed
             List<string> matchingFilePaths = GetFilesWithExtensions(ProductionGUI_Directory, targetExtensions);
 
-            // Output the results
-            foreach (string filePath in matchingFilePaths)
+            if (matchingFilePaths.Any())
             {
-                Console.WriteLine(filePath);
+                string pdfFilePath = Path.Combine(destinationFolderPath, "CodeFiles.pdf");
+                ExportToPdf(matchingFilePaths, pdfFilePath);
+                Console.WriteLine($"PDF file exported to: {pdfFilePath}");
+            }
+            else
+            {
+                Console.WriteLine("No .cs files found.");
             }
 
-            int numberOfFiles = 0;
+            int numberOfFiles = matchingFilePaths.Count;
             Console.WriteLine($"\nCode Files Discovered: {numberOfFiles}");
 
             
@@ -39,18 +46,57 @@ namespace Print_Code_To_PDF
         {
             List<string> matchingFilePaths = new List<string>();
 
-            foreach (string extension in extensions)
+            try
             {
-                string searchPattern = Path.Combine(rootFolderPath, "*" + extension);
-                foreach (string filePath in Directory.GetFiles(rootFolderPath, extension, SearchOption.AllDirectories))
+                foreach (string extension in extensions)
                 {
-                    matchingFilePaths.Add(filePath);
+                    string searchPattern = "*" + extension;
+                    Console.WriteLine($"Searching for: {searchPattern}");
+
+                    foreach (string filePath in Directory.EnumerateFiles(rootFolderPath, searchPattern, SearchOption.AllDirectories))
+                    {
+                        if (!filePath.EndsWith(".g.i.cs", StringComparison.OrdinalIgnoreCase) && !filePath.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchingFilePaths.Add(filePath);
+                        }
+                    }
                 }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine($"Error accessing folder: {ex.Message}");
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                Console.WriteLine($"Folder not found: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
             }
 
             return matchingFilePaths;
         }
 
+        static void ExportToPdf(List<string> filePaths, string pdfFilePath)
+        {
+            using (PdfWriter writer = new PdfWriter(pdfFilePath))
+            {
+                using (PdfDocument pdf = new PdfDocument(writer))
+                {
+                    Document document = new Document(pdf);
+
+                    foreach (string filePath in filePaths)
+                    {
+                        string fileName = Path.GetFileName(filePath);
+                        string fileContent = File.ReadAllText(filePath);
+
+                        document.Add(new Paragraph(fileName));
+                        document.Add(new Paragraph(fileContent));
+                    }
+                }
+            }
+        }
 
         #region Directory Tree Creation Methods
         private static string GetIndent(int level)
